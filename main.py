@@ -18,6 +18,7 @@ from textblob import TextBlob
 
 
 window = None
+owner_name = "Martin"
 
 def parse_message(line):
     # Regex für das Format: "31.01.25, 02:17 - Absender: Nachricht"
@@ -139,36 +140,69 @@ def prepare_data():
             os.rmdir(extract_folder)
     merge_csv_files(csv_folder, './all_chats.csv')
 
+def is_emoji(character):
+    try:
+        # Check if the character is in a known emoji Unicode range
+        # Unicode ranges for emojis
+        if '\U0001F600' <= character <= '\U0001F64F' or \
+           '\U0001F300' <= character <= '\U0001F5FF' or \
+           '\U0001F680' <= character <= '\U0001F6FF' or \
+           '\U0001F700' <= character <= '\U0001F77F' or \
+           '\U0001F780' <= character <= '\U0001F7FF' or \
+           '\U0001F800' <= character <= '\U0001F8FF' or \
+           '\U0001F900' <= character <= '\U0001F9FF' or \
+           '\U0001FA00' <= character <= '\U0001FA6F' or \
+           '\U0001FA70' <= character <= '\U0001FAFF' or \
+           '\U00002702' <= character <= '\U000027B0' or \
+           '\U000024C2' <= character <= '\U0001F251':
+            return True
+        return False
+    except TypeError:
+        return False
+
+def choose_users():
+    users = []
+    input_string = simpledialog.askstring("Input", "Enter the names of the users to analyse separated by a comma (leave empty for all):", parent=window)
+    if input_string != "":
+        users = input_string.split(',')
+        for i in range(len(users)):
+            users[i] = users[i].strip()
+    else:
+        users = pd.read_csv('all_chats.csv')['Chat'].unique()
+    return users
+
+#Analysis functions 
 def analyse_message_amount():
     #Make bar chart of message amount
     df = pd.read_csv('all_chats.csv')
 
-    df_other = df[df['Absender'] != "Martin"]
-    df_martin = df[df['Absender'] == "Martin"]
+    df_other = df[df['Absender'] != owner_name]
+    df_owner = df[df['Absender'] == owner_name]
 
     # Count the number of messages for each sender
     message_counts_other = df_other['Chat'].value_counts()
-    message_counts_martin = df_martin['Chat'].value_counts()
+    message_counts_owner = df_owner['Chat'].value_counts()
 
     # Create a bar chart
     fig, ax = plt.subplots(figsize=(10, 6))
     
     ax.bar(message_counts_other.index, message_counts_other.values)
-    ax.bar(message_counts_martin.index, message_counts_martin.values, bottom=message_counts_other.values)
+    ax.bar(message_counts_owner.index, message_counts_owner.values, bottom=message_counts_other.values)
 
     # Add labels and title
     ax.set_xlabel('Chat')
     ax.set_ylabel('Message Count')
     ax.set_title('Message Count by Sender for Each Chat')
 
-    ax.legend(title="Sender", labels=['Other', 'Martin'])
+    ax.legend(title="Sender", labels=['Other', owner_name])
 
     # Display the plot
     plt.tight_layout()
     plt.show()
 
 def analyse_message_frequency():
-    name = simpledialog.askstring("Input", "Enter the name of the person whose chat you want to analyse:", parent=window)
+    #name = simpledialog.askstring("Input", "Enter the name of the person whose chat you want to analyse:", parent=window)
+    names = choose_users()
 
     #Read data from all_chats.csv and import into pandas
     df = pd.read_csv('all_chats.csv')
@@ -189,7 +223,7 @@ def analyse_message_frequency():
     plt.figure(figsize=(10, 6))
 
     # Filter the data for a specific sender
-    message_counts = message_counts[message_counts['Chat'] == name]
+    message_counts = message_counts[message_counts['Chat'].isin(names)]
 
     # We will create a line for each sender showing the number of messages per month
     for sender in message_counts['Chat'].unique():
@@ -221,16 +255,16 @@ def analyse_message_length():
 
     df['Nachricht'] = df['Nachricht'].astype(str)
 
-    df_other = df[df['Absender'] != "Martin"]
-    df_martin = df[df['Absender'] == "Martin"]
+    df_other = df[df['Absender'] != owner_name]
+    df_owner = df[df['Absender'] == owner_name]
 
     # Calculate the length of each message
     df_other['Message_Length'] = df_other['Nachricht'].apply(lambda x: len(x))
-    df_martin['Message_Length'] = df_martin['Nachricht'].apply(lambda x: len(x))
+    df_owner['Message_Length'] = df_owner['Nachricht'].apply(lambda x: len(x))
 
     # Group by 'Absender' (sender) and calculate the average message length
     avg_message_length_other = df_other.groupby('Chat')['Message_Length'].mean()
-    avg_message_length_martin = df_martin.groupby('Chat')['Message_Length'].mean()
+    avg_message_length_owner = df_owner.groupby('Chat')['Message_Length'].mean()
 
     # Create a figure and axis
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -243,7 +277,7 @@ def analyse_message_length():
 
     # Plot the bars for Sender1 and Sender2
     ax.bar(index - bar_width/2, avg_message_length_other.values, bar_width, label='Other')  # Bar for Sender1
-    ax.bar(index + bar_width/2, avg_message_length_martin.values, bar_width, label='Martin')  # Bar for Sender2
+    ax.bar(index + bar_width/2, avg_message_length_owner.values, bar_width, label=owner_name)  # Bar for Sender2
 
     # Add labels and title
     ax.set_xlabel('Chat')
@@ -259,34 +293,12 @@ def analyse_message_length():
     plt.tight_layout()
     plt.show()
 
-def is_emoji(character):
-    try:
-        # Check if the character is in a known emoji Unicode range
-        # Unicode ranges for emojis
-        if '\U0001F600' <= character <= '\U0001F64F' or \
-           '\U0001F300' <= character <= '\U0001F5FF' or \
-           '\U0001F680' <= character <= '\U0001F6FF' or \
-           '\U0001F700' <= character <= '\U0001F77F' or \
-           '\U0001F780' <= character <= '\U0001F7FF' or \
-           '\U0001F800' <= character <= '\U0001F8FF' or \
-           '\U0001F900' <= character <= '\U0001F9FF' or \
-           '\U0001FA00' <= character <= '\U0001FA6F' or \
-           '\U0001FA70' <= character <= '\U0001FAFF' or \
-           '\U00002702' <= character <= '\U000027B0' or \
-           '\U000024C2' <= character <= '\U0001F251':
-            return True
-        return False
-    except TypeError:
-        return False
-
 def analyse_emoji():
-    chat_filter = simpledialog.askstring("Input", "Enter the name of the person whose chat you want to analyse:", parent=window)
+    chat_filter = choose_users()
 
     df = pd.read_csv('all_chats.csv')
 
-    if chat_filter != "":
-        # Filter the data for a specific sender
-        df = df[df['Chat'] == chat_filter]
+    df = df[df['Chat'].isin(chat_filter)]
 
     df['Nachricht'] = df['Nachricht'].astype(str)
 
@@ -329,19 +341,29 @@ def analyse_emoji():
     plt.tight_layout()
     plt.show()
 
-def answer_deviation():
-    chat_filter = simpledialog.askstring("Input", "Enter the name of the person whose chat you want to analyse (leave empty for all):", parent=window)
+def last_message_of_conversation():
+    chat_filter = choose_users()
 
     df = pd.read_csv('all_chats.csv')
 
-    if chat_filter != "":
-        # Filter the data for a specific sender
-        df = df[df['Chat'] == chat_filter]
+    df = df[df['Chat'].isin(chat_filter)]
 
-    df["random_walk"] = df["Absender"].apply(lambda x: -1 if x == "Martin" else 1)
+    #Group by day and chat
+    df = df.groupby(['Datum'])
+
+def answer_deviation():
+    chat_filter = choose_users()
+
+    df = pd.read_csv('all_chats.csv')
+
+    # Ensure the 'Datum' (Date) column is in datetime format
+    df['Datum'] = pd.to_datetime(df['Datum'], format='%d.%m.%y')
+
+    df = df[df['Chat'].isin(chat_filter)]
+
+    df["random_walk"] = df["Absender"].apply(lambda x: -1 if x == owner_name else 1)
 
     df["random_walk"] = df["random_walk"].cumsum()
-
 
     plt.figure(figsize=(10, 6))
 
@@ -352,9 +374,9 @@ def answer_deviation():
     plt.xlabel("Date")
     plt.ylabel("Answer Deviation")
 
-    # Set the locator for months and format for labels
-    plt.gca().xaxis.set_major_locator(MonthLocator())  # Set major ticks to months
-    plt.gca().xaxis.set_major_formatter(DateFormatter('%b %Y'))  # Format labels as Month Year (e.g., 'Jan 2021')
+    plt.gca().xaxis.set_major_locator(mdates.YearLocator())
+    plt.gca().xaxis.set_minor_locator(mdates.MonthLocator())
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
 
     # Rotate and spread out the x-axis date labels
     plt.xticks(rotation=45, ha='right')  # Rotate labels by 45 degrees for readability
@@ -363,13 +385,11 @@ def answer_deviation():
     plt.show()
 
 def time_of_day_analysis():
-    chat_filter = simpledialog.askstring("Input", "Enter the name of the person whose chat you want to analyse (leave empty for all):", parent=window)
+    chat_filter = choose_users()
 
     df = pd.read_csv('all_chats.csv')
 
-    if chat_filter != "":
-        # Filter the data for a specific sender
-        df = df[df['Chat'] == chat_filter]
+    df = df[df['Chat'].isin(chat_filter)]
 
     df['Uhrzeit'] = pd.to_datetime(df['Uhrzeit'], format='%H:%M')
 
@@ -406,21 +426,21 @@ def sentiment_analysis():
 
     df['Nachricht'] = df['Nachricht'].astype(str)
 
-    df_other = df[df['Absender'] != "Martin"]
-    df_martin = df[df['Absender'] == "Martin"]
+    df_other = df[df['Absender'] != owner_name]
+    df_owner = df[df['Absender'] == owner_name]
 
     #TODO: Does this makes sense?
     #filter out messages with high objectivity (since they dont really matter for polarity)
     df_other = df_other[df_other['Nachricht'].apply(lambda x: TextBlob(x).sentiment.subjectivity) < 0.5]
-    df_martin = df_martin[df_martin['Nachricht'].apply(lambda x: TextBlob(x).sentiment.subjectivity) < 0.5]
+    df_owner = df_owner[df_owner['Nachricht'].apply(lambda x: TextBlob(x).sentiment.subjectivity) < 0.5]
 
     # Calculate the length of each message
     df_other['Sentiment'] = df_other['Nachricht'].apply(lambda x: TextBlob(x).sentiment.polarity)
-    df_martin['Sentiment'] = df_martin['Nachricht'].apply(lambda x: TextBlob(x).sentiment.polarity)
+    df_owner['Sentiment'] = df_owner['Nachricht'].apply(lambda x: TextBlob(x).sentiment.polarity)
 
     # Group by 'Absender' (sender) and calculate the average message length
     avg_sentiment_other = df_other.groupby('Chat')['Sentiment'].mean()
-    avg_sentiment_martin = df_martin.groupby('Chat')['Sentiment'].mean()
+    avg_sentiment_owner = df_owner.groupby('Chat')['Sentiment'].mean()
 
     # Create a figure and axis
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -433,7 +453,7 @@ def sentiment_analysis():
 
     # Plot the bars for Sender1 and Sender2
     ax.bar(index - bar_width/2, avg_sentiment_other.values, bar_width, label='Other')
-    ax.bar(index + bar_width/2, avg_sentiment_martin.values, bar_width, label='Martin')
+    ax.bar(index + bar_width/2, avg_sentiment_owner.values, bar_width, label=owner_name)
 
     # Add labels and title
     ax.set_xlabel('Chat')
@@ -449,10 +469,57 @@ def sentiment_analysis():
     plt.tight_layout()
     plt.show()
 
+def own_message_frequency():
+    df = pd.read_csv('all_chats.csv')
+
+    df = df[df['Absender'] == owner_name]
+
+    # Ensure the 'Datum' (Date) column is in datetime format
+    df['Datum'] = pd.to_datetime(df['Datum'], format='%d.%m.%y')
+
+    # Create a new column that represents month intervals
+    df['Two_Month_Interval'] = df['Datum'].apply(lambda x: pd.Timestamp(datetime(x.year, ((x.month-1)//1)*1+1, 1)))
+
+    # Group by 'Month_Year' and 'Absender' (sender) and count the messages
+    message_counts = df.groupby('Two_Month_Interval').size().reset_index(name='Message_Count')
+
+    # Create a plot for each sender
+    plt.figure(figsize=(10, 6))
+
+    plt.plot(message_counts['Two_Month_Interval'], message_counts['Message_Count'])
+
+    # Format the x-axis to show the timeline
+    plt.gca().xaxis.set_major_locator(mdates.YearLocator())
+    plt.gca().xaxis.set_minor_locator(mdates.MonthLocator())
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+
+    plt.axhline(0, color='grey', linewidth=1, linestyle='--')
+    # Rotate the labels for readability
+    plt.xticks(rotation=45)
+
+    # Add labels and title
+    plt.xlabel('Month')
+    plt.ylabel('Number of Messages')
+    plt.title('Timeline of Messages by ' + owner_name +' (Fist Message - Present)')
+
+    # Display the plot
+    plt.tight_layout()
+    plt.show()
+#--------------------------------------------
+
 def on_prepare_data():
     print("Data preparation started...")
     prepare_data()
     print("Data preparation completed.")
+
+def detect_owner_name():
+    df = pd.read_csv('all_chats.csv')
+    df = df.groupby('Chat')['Absender'].unique().reset_index()
+
+    common_elements = set(df['Absender'].iloc[0])  # Start with the first row's set
+    for senders in df['Absender']:
+        common_elements.intersection_update(senders)  # Keep only elements present in all rows
+    return common_elements.pop()  # Return the only element left
 
 def on_analysis_mode(mode):
     if mode == "Message Amount":
@@ -471,6 +538,8 @@ def on_analysis_mode(mode):
         time_of_day_analysis()
     elif mode == "Sentiment Analysis":
         sentiment_analysis()
+    elif mode == "Own Message Frequency":
+        own_message_frequency()
 
 def create_window():
     # Create the main window
@@ -490,7 +559,7 @@ def create_window():
     mode_frame.pack(pady=10)
 
     # List of analysis modes
-    modes = ["Message Amount", "Message Frequency", "Average Message Length", "Emoji Analysis", "Answer Deviation", "Last Message of Conversaion", "Time of Day Analysis", "Sentiment Analysis"]
+    modes = ["Message Amount", "Message Frequency", "Average Message Length", "Emoji Analysis", "Answer Deviation", "Last Message of Conversaion", "Time of Day Analysis", "Sentiment Analysis", "Own Message Frequency"]
 
     # Create a button for half of the analysis modes
     for mode in modes:
@@ -500,4 +569,7 @@ def create_window():
     # Run the Tkinter event loop
     window.mainloop()
 
-create_window()
+if __name__ == "__main__":
+    owner_name = detect_owner_name()
+    create_window()
+
